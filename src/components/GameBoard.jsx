@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Star, Award } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { processFrame } from '../utils/arEngine';
 
 const COLOR_THEMES = {
@@ -15,6 +15,9 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
   const [colorMatched, setColorMatched] = useState(false);
   const [timeLeft, setTimeLeft] = useState(mission.timeLimit || 30);
   const [isSuccess, setIsSuccess] = useState(false);
+  
+  // 실시간 보물 바운딩 박스 상태
+  const [detectedRect, setDetectedRect] = useState(null);
 
   const canvasRef = useRef(null);
   const requestRef = useRef(null);
@@ -26,6 +29,7 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
     setIsSuccess(false);
     setFillRatio(0);
     setColorMatched(false);
+    setDetectedRect(null);
   }, [mission]);
 
   // 실시간 카메라 분석 루프
@@ -44,11 +48,16 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
         );
         setFillRatio(result.fillRatio);
         setColorMatched(result.colorMatched);
+        
+        // 보물 감지 상자(레이아웃) 정보 저장
+        setDetectedRect(result.detectedRect);
 
         if (result.fillRatio >= 65 && result.colorMatched) {
           setIsSuccess(true);
           onCompleteMission(result.fillRatio, result.cropDataUrl);
         }
+      } else {
+        setDetectedRect(null);
       }
       requestRef.current = requestAnimationFrame(analyze);
     };
@@ -95,6 +104,24 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
       
       <canvas ref={canvasRef} className="hidden" />
 
+      {/* 실시간으로 사물의 실제 인식 크기를 잡아주는 노란색 바운딩 가이드 (미러링 반전 렌더링 동기화) */}
+      {detectedRect && !isSuccess && (
+        <div 
+          className="absolute border-4 border-dashed border-yellow-300 bg-yellow-400/10 rounded-2xl transition-all duration-75 flex items-start justify-end p-2 z-10"
+          style={{
+            // 미러링(좌우 반전) 처리를 반영하여 x좌표 역계산 (100 - x - width)
+            left: `${100 - detectedRect.x - detectedRect.width}%`,
+            top: `${detectedRect.y}%`,
+            width: `${detectedRect.width}%`,
+            height: `${detectedRect.height}%`
+          }}
+        >
+          <span className="bg-yellow-300 text-slate-950 font-black text-[10px] px-1.5 py-0.5 rounded shadow Noto">
+            보물 감지 중! 📦
+          </span>
+        </div>
+      )}
+
       {/* 상단 미션 바 */}
       <div className="absolute top-6 left-12 right-12 flex flex-col items-center pointer-events-none z-20">
         <div className="bg-slate-950/90 border-4 border-slate-700/85 px-10 py-6 rounded-[35px] shadow-2xl flex flex-col items-center max-w-4xl w-full text-center">
@@ -134,7 +161,7 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
         </div>
       </div>
 
-      {/* 중앙 타겟 영역: 미션 카드 오버랩 차단을 위해 CSS Y축 오프셋을 58% 아래로 변경 (translate-y-[8vh] 적용) */}
+      {/* 중앙 타겟 점선 영역 */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 translate-y-[8vh]">
         <div 
           className={`border-[8px] border-dashed transition-all duration-200 relative flex items-center justify-center ${
