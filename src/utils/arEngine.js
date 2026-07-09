@@ -2,23 +2,24 @@
 
 // RGB를 HSV로 변환 후 지정된 색상 범위 내에 드는지 판정하는 헬퍼 함수
 export function isColorMatch(h, s, v, colorName) {
-  // 아이들 방 조명 상황 및 원거리 TV 환경을 고려하여 색상 검출 범위를 여유롭게 버퍼링
+  // 연두색 화장품 상자 및 실내 조명 왜곡을 고려하여 색상 임계치 매핑 조정
   switch (colorName) {
     case '빨강':
       return ((h >= 0 && h <= 12) || (h >= 168 && h <= 180)) && s >= 45 && v >= 35;
     case '파랑':
       return h >= 90 && h <= 135 && s >= 45 && v >= 35;
     case '노랑':
-      return h >= 14 && h <= 36 && s >= 55 && v >= 60;
+      // 노란색 범위를 14~28로 좁혀 연두색(올리브/밝은초록) 대역인 30 이상과 명확히 구분
+      return h >= 14 && h <= 28 && s >= 55 && v >= 60;
     case '초록':
-      return h >= 38 && h <= 88 && s >= 35 && v >= 35;
+      // 초록색의 최소 범위를 38에서 29로 낮춰 연두색, 올리브그린 톤의 사물도 초록색 미션에 완전히 통과하도록 매핑
+      return h >= 29 && h <= 88 && s >= 30 && v >= 35;
     default:
       return false;
   }
 }
 
 // 신체 부위(사람의 피부톤)를 걸러내기 위한 HSV 범위 판별 헬퍼
-// 피부색 영역 판정을 정밀화하여 일반 무채색/어두운색 물체와 오버랩을 최소화
 export function isSkinColor(h, s, v) {
   return h >= 3 && h <= 17 && s >= 40 && s <= 150 && v >= 50;
 }
@@ -106,7 +107,7 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
           continue;
         }
 
-        // 2. 전경 물체 감도 상향 조정: 무채색(검은색 컵, 흰 책 등) 및 저채도 물체 감지를 위해 최소 Saturation(s) 임계값을 12로, 명도(v) 임계값을 30으로 대폭 인하
+        // 2. 전경 물체 감도 상향 조정
         const isForeground = s > 12 && v > 30;
 
         if (isForeground) {
