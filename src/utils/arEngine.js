@@ -135,8 +135,8 @@ export function processFrame(
         isChanged = dist > 42; // 차이가 42 이상이면 유의미한 변화(움직인 물체)로 판정
       }
 
-      // 어두운 영역이나 무채색 노이즈 방지용 최소 채도/명도
-      const isForeground = isChanged && s > 15 && v > 30;
+      // 어두운 영역이나 무채색 노이즈 방지용 최소 채도/명도 (검은 티셔츠 및 그림자 노이즈 차단)
+      const isForeground = isChanged && s > 24 && v > 40;
 
       if (isForeground) {
         let isValidForeground = true;
@@ -145,8 +145,8 @@ export function processFrame(
         }
 
         if (isValidForeground) {
-          // 타켓 검사 윈도우 내부 혹은 가이드 영역 근처에 있는 픽셀만 사각형 산출에 반영
-          const searchMargin = pixelSize * 1.2;
+          // 물체 감지 마진 범위를 확장하여 가이드 상자 근처 접근 시 바로 추적되도록 함
+          const searchMargin = Math.max(pixelSize * 1.6, 140);
           if (x >= centerX - searchMargin && x <= centerX + searchMargin &&
               y >= centerY - searchMargin && y <= centerY + searchMargin) {
             if (x < minX) minX = x;

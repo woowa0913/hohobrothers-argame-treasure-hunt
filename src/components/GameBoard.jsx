@@ -187,7 +187,7 @@ export default function GameBoard({
 
       {/* 2. 상단 미션 안내 스크린 */}
       <div className="w-full flex flex-col items-center pointer-events-none z-20 px-4 pt-4">
-        <div className="bg-slate-950/90 border-4 border-slate-700/85 px-4 py-3 rounded-[24px] shadow-2xl flex flex-col items-center w-full text-center">
+        <div className="bg-slate-950/90 border-4 border-slate-700/85 px-4 py-3 rounded-[24px] shadow-2xl flex flex-col items-center max-w-md md:max-w-xl w-full mx-auto text-center">
           
           {playerLabel && (
             <div className={`px-4 py-1 rounded-full text-xs font-black mb-2 text-white ${centerXPercent < 0.5 ? 'bg-indigo-600' : 'bg-rose-600'}`}>
