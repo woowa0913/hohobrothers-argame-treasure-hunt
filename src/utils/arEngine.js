@@ -18,8 +18,9 @@ export function isColorMatch(h, s, v, colorName) {
 }
 
 export function isSkinColor(h, s, v) {
-  // 아시아인 피부색 톤을 포함해 손/신체 필터링 범위를 최적화
-  return h >= 0 && h <= 20 && s >= 20 && s <= 165 && v >= 35;
+  // 아시아인 피부색 톤(손, 팔, 얼굴)을 광범위하게 검출하여 감지 영역에서 제외
+  // Hue(0-25 내외), Saturation(15-180), Value(30-255) 영역 커버
+  return h >= 0 && h <= 28 && s >= 15 && s <= 185 && v >= 30;
 }
 
 export function processFrame(

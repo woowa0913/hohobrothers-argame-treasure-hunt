@@ -180,7 +180,7 @@ export default function GameBoard({
           }}
         >
           <span className="bg-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded shadow Noto">
-            물체 감지 중! 📦
+            보물 감지 중! 📦
           </span>
         </div>
       )}
