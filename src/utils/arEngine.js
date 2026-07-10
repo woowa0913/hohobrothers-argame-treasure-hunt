@@ -39,8 +39,9 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
   const sizePercentage = mission.sizePercent || 15; 
   const pixelSize = Math.round(Math.min(width, height) * (sizePercentage / 100) * sizeMultiplier * 1.5);
 
+  // 상단 겹침 방지: 타겟의 Y축 중심선을 화면 전체 높이의 68% 지점으로 대폭 하향 조정
   const centerX = Math.round(width / 2);
-  const centerY = Math.round(height * 0.58); 
+  const centerY = Math.round(height * 0.68); 
   
   let inMissionArea = (x, y) => false;
   let areaPixelCount = 0;
@@ -76,72 +77,62 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
   let overlappingPixels = 0;
   let matchingColorPixels = 0;
 
-  // 물체 크기 초과(벌점) 판정을 위한 외곽 바운딩 영역 정의
-  // 점선 영역의 1.35배 영역을 초과하는 픽셀 검사용
   const outerLimitRadius = Math.round(pixelSize * 1.35 / 2);
   let outerOverlapPixels = 0;
 
-  // 물체의 실시간 경계 상자(Bounding Box) 추적용 좌표
+  // 1. 버그 수정: 보물의 실루엣 박스가 서칭 한계에 걸려 망가지지 않도록, 화면 전체 좌표계를 기준으로 물건의 min/max 경계를 계산
   let minX = width;
   let maxX = 0;
   let minY = height;
   let maxY = 0;
   let detectedForegroundCount = 0;
 
-  // 픽셀 분석을 미션 중심부의 1.8배 범위까지 넓혀 외곽 초과 감시 및 크롭 영역 매핑
-  const maxSearchHalf = Math.round(pixelSize * 1.8 / 2);
-  const startX = Math.max(0, centerX - maxSearchHalf);
-  const endX = Math.min(width - 1, centerX + maxSearchHalf);
-  const startY = Math.max(0, centerY - maxSearchHalf);
-  const endY = Math.min(height - 1, centerY + maxSearchHalf);
-
-  for (let y = startY; y <= endY; y++) {
-    for (let x = startX; x <= endX; x++) {
-      const idx = (y * width + x) * 4;
+  // 전체 화면 루프(단, 처리 속도 향상을 위해 3픽셀씩 건너뛰며 스캔)
+  for (let y = 0; y < height; y += 3) {
+    for (let x = 0; x < width; x += 3) {
       const hsvIdx = (y * width + x) * 3;
       const h = hsv.data[hsvIdx];     
       const s = hsv.data[hsvIdx + 1]; 
       const v = hsv.data[hsvIdx + 2]; 
 
-      // 피부색 감지 시 건너뜀 (손 제외 기능 완벽 지원)
+      // 피부(손) 제외
       if (isSkinColor(h, s, v)) {
         continue;
       }
 
-      // 전경 물체 식별
+      // 물건 전경 감지
       const isForeground = s > 12 && v > 30;
 
       if (isForeground) {
-        // 물체 경계 상자 트래킹 업데이트
+        // 물체 외곽 크기 경계 업데이트
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
         detectedForegroundCount++;
 
-        // 1) 점선 영역 내부 픽셀 겹침
+        // 타겟 점선 영역 안에 위치하는지 체크
         if (inMissionArea(x, y)) {
-          overlappingPixels++;
+          overlappingPixels += 9; // 3x3 스캔 보간
           if (mission.color) {
             if (isColorMatch(h, s, v, mission.color)) {
-              matchingColorPixels++;
+              matchingColorPixels += 9;
             }
           }
         } else {
-          // 2) 점선 외부 1.35배 영역 밖으로 과도하게 침범한 경우
+          // 점선 외부 1.35배 바깥 침범 검사
           const dx = x - centerX;
           const dy = y - centerY;
           if (dx * dx + dy * dy > outerLimitRadius * outerLimitRadius) {
-            outerOverlapPixels++;
+            outerOverlapPixels += 9;
           }
         }
       }
     }
   }
 
-  // 채움 비율 계산: 내부 채움률 - 외부 이탈 벌점율
+  // 최종 채움률 연산
   const baseRatio = (overlappingPixels / areaPixelCount) * 100;
-  // 바깥으로 많이 삐져나가면 최종 채움률을 깎아버림 (1.35배 반경 밖 초과 픽셀 1개당 감점 가중치 적용)
   const penaltyRatio = (outerOverlapPixels / areaPixelCount) * 40; 
   const fillRatio = Math.max(0, Math.min(100, Math.round(baseRatio - penaltyRatio)));
   
@@ -153,9 +144,9 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
     colorMatched = true;
   }
 
-  // 실시간 보물 바운딩 박스 데이터 구성 (손 배제된 좌표)
+  // 2. 바운딩 박스 유효성 검사 보강
   let detectedRect = null;
-  if (detectedForegroundCount > 40) { // 노이즈 방지 최소 픽셀값
+  if (detectedForegroundCount > 15 && minX < maxX && minY < maxY) {
     detectedRect = {
       x: Math.round((minX / width) * 100),
       y: Math.round((minY / height) * 100),

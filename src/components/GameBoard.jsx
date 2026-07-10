@@ -16,7 +16,6 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
   const [timeLeft, setTimeLeft] = useState(mission.timeLimit || 30);
   const [isSuccess, setIsSuccess] = useState(false);
   
-  // 실시간 보물 바운딩 박스 상태
   const [detectedRect, setDetectedRect] = useState(null);
 
   const canvasRef = useRef(null);
@@ -32,7 +31,7 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
     setDetectedRect(null);
   }, [mission]);
 
-  // 실시간 카메라 분석 루프
+  // 실시간 분석 루프
   useEffect(() => {
     let active = true;
 
@@ -48,8 +47,6 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
         );
         setFillRatio(result.fillRatio);
         setColorMatched(result.colorMatched);
-        
-        // 보물 감지 상자(레이아웃) 정보 저장
         setDetectedRect(result.detectedRect);
 
         if (result.fillRatio >= 65 && result.colorMatched) {
@@ -72,7 +69,7 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
     };
   }, [mission, calibrationScale, isSuccess]);
 
-  // 카운트다운 타이머
+  // 타이머
   useEffect(() => {
     if (timeLeft <= 0) {
       onTimeOut(fillRatio);
@@ -104,47 +101,47 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
       
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* 실시간으로 사물의 실제 인식 크기를 잡아주는 노란색 바운딩 가이드 (미러링 반전 렌더링 동기화) */}
+      {/* 1. 실시간 보물 바운딩 테두리 (미러링 보정 렌더링) */}
       {detectedRect && !isSuccess && (
         <div 
-          className="absolute border-4 border-dashed border-yellow-300 bg-yellow-400/10 rounded-2xl transition-all duration-75 flex items-start justify-end p-2 z-10"
+          className="absolute border-4 border-dashed border-yellow-400 bg-yellow-400/10 rounded-2xl transition-all duration-75 flex items-start justify-end p-2 z-15 pointer-events-none"
           style={{
-            // 미러링(좌우 반전) 처리를 반영하여 x좌표 역계산 (100 - x - width)
-            left: `${100 - detectedRect.x - detectedRect.width}%`,
-            top: `${detectedRect.y}%`,
-            width: `${detectedRect.width}%`,
-            height: `${detectedRect.height}%`
+            // x좌표 반전(100 - x - width) 및 범위 유효 필터링
+            left: `${Math.max(0, Math.min(100, 100 - detectedRect.x - detectedRect.width))}%`,
+            top: `${Math.max(0, Math.min(100, detectedRect.y))}%`,
+            width: `${Math.max(2, Math.min(100, detectedRect.width))}%`,
+            height: `${Math.max(2, Math.min(100, detectedRect.height))}%`
           }}
         >
-          <span className="bg-yellow-300 text-slate-950 font-black text-[10px] px-1.5 py-0.5 rounded shadow Noto">
+          <span className="bg-yellow-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded shadow Noto">
             보물 감지 중! 📦
           </span>
         </div>
       )}
 
-      {/* 상단 미션 바 */}
-      <div className="absolute top-6 left-12 right-12 flex flex-col items-center pointer-events-none z-20">
-        <div className="bg-slate-950/90 border-4 border-slate-700/85 px-10 py-6 rounded-[35px] shadow-2xl flex flex-col items-center max-w-4xl w-full text-center">
+      {/* 2. 상단 미션 안내 스크린 (패딩 슬림화로 영역 간섭 축소) */}
+      <div className="absolute top-4 left-12 right-12 flex flex-col items-center pointer-events-none z-20">
+        <div className="bg-slate-950/90 border-4 border-slate-700/85 px-8 py-4 rounded-[30px] shadow-2xl flex flex-col items-center max-w-4xl w-full text-center">
           
           {/* 타이머 바 */}
-          <div className="w-full h-5 bg-slate-800 rounded-full overflow-hidden border-2 border-slate-700 mb-4">
+          <div className="w-full h-4 bg-slate-800 rounded-full overflow-hidden border-2 border-slate-700 mb-3">
             <div 
               className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 8 ? 'bg-rose-500 animate-pulse' : 'bg-amber-400'}`}
               style={{ width: `${(timeLeft / (mission.timeLimit || 30)) * 100}%` }}
             />
           </div>
 
-          <div className="flex items-center gap-4 justify-center">
-            <span className="text-4xl">⭐</span>
-            <span className="text-5xl md:text-7xl font-black tracking-tight Noto text-white">
+          <div className="flex items-center gap-3 justify-center">
+            <span className="text-3xl">⭐</span>
+            <span className="text-4xl md:text-6xl font-black tracking-tight Noto text-white">
               {mission.color ? (
                 <>
-                  <span className={`${theme.text} text-6xl md:text-8xl mr-3 font-black`}>{mission.color}색</span>
+                  <span className={`${theme.text} text-5xl md:text-7xl mr-2 font-black`}>{mission.color}색</span>
                   보물을 가져와!
                 </>
               ) : (
                 <>
-                  <span className="text-teal-400 text-6xl md:text-8xl mr-3 font-black">{mission.title}</span>
+                  <span className="text-teal-400 text-5xl md:text-7xl mr-2 font-black">{mission.title}</span>
                   상자에 맞춰봐!
                 </>
               )}
@@ -152,8 +149,8 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
           </div>
 
           {mission.color && (
-            <div className="mt-3">
-              <span className={`text-xl font-black ${colorMatched ? 'text-emerald-400' : 'text-slate-400'} Noto`}>
+            <div className="mt-2">
+              <span className={`text-lg font-black ${colorMatched ? 'text-emerald-400' : 'text-slate-400'} Noto`}>
                 {colorMatched ? "👍 우와! 똑같은 색이야!" : "👀 비슷한 색깔을 찾고 있어!"}
               </span>
             </div>
@@ -161,8 +158,8 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
         </div>
       </div>
 
-      {/* 중앙 타겟 점선 영역 */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 translate-y-[8vh]">
+      {/* 3. 중앙 타겟 영역: 겹침 현상을 원천 방지하기 위해 top: 68% (translate-y-[18vh]) 지점까지 확실하게 하강 */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 translate-y-[18vh]">
         <div 
           className={`border-[8px] border-dashed transition-all duration-200 relative flex items-center justify-center ${
             isSuccess 
@@ -188,7 +185,7 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
         </div>
       </div>
 
-      {/* 우측 레이아웃 */}
+      {/* 우측 획득 점수 및 보물함 */}
       <div className="absolute top-6 right-12 z-20 flex flex-col items-end gap-4 pointer-events-auto">
         <div className="bg-amber-400 text-slate-950 px-8 py-4 rounded-3xl border-4 border-amber-600 shadow-xl font-black flex items-center gap-3">
           <span className="text-3xl">🏆</span>
@@ -219,7 +216,7 @@ export default function GameBoard({ videoRef, mission, calibrationScale, onCompl
         )}
       </div>
 
-      {/* 미션 클리어 성공 오버레이 */}
+      {/* 성공 이펙트 */}
       {isSuccess && (
         <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center backdrop-blur-sm z-30 transition-all duration-300">
           <div className="bg-emerald-400 text-slate-950 p-8 rounded-full mb-6 animate-bounce border-8 border-white shadow-2xl">
