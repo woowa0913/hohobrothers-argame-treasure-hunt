@@ -1,6 +1,7 @@
 // 미션 카드에 따른 분석을 수행하는 AR 엔진 (OpenCV.js 기반)
 
 export function isColorMatch(h, s, v, colorName) {
+  // 실내 조명 왜곡을 고려하여 감지 폭 유지
   switch (colorName) {
     case '빨강':
       return ((h >= 0 && h <= 12) || (h >= 168 && h <= 180)) && s >= 45 && v >= 35;
@@ -39,7 +40,6 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
   const sizePercentage = mission.sizePercent || 15; 
   const pixelSize = Math.round(Math.min(width, height) * (sizePercentage / 100) * sizeMultiplier * 1.5);
 
-  // 상단 겹침 방지: 타겟의 Y축 중심선을 화면 전체 높이의 68% 지점으로 대폭 하향 조정
   const centerX = Math.round(width / 2);
   const centerY = Math.round(height * 0.68); 
   
@@ -80,14 +80,12 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
   const outerLimitRadius = Math.round(pixelSize * 1.35 / 2);
   let outerOverlapPixels = 0;
 
-  // 1. 버그 수정: 보물의 실루엣 박스가 서칭 한계에 걸려 망가지지 않도록, 화면 전체 좌표계를 기준으로 물건의 min/max 경계를 계산
   let minX = width;
   let maxX = 0;
   let minY = height;
   let maxY = 0;
   let detectedForegroundCount = 0;
 
-  // 전체 화면 루프(단, 처리 속도 향상을 위해 3픽셀씩 건너뛰며 스캔)
   for (let y = 0; y < height; y += 3) {
     for (let x = 0; x < width; x += 3) {
       const hsvIdx = (y * width + x) * 3;
@@ -100,51 +98,57 @@ export function processFrame(videoElement, canvasElement, bgMat, mission, calibr
         continue;
       }
 
-      // 물건 전경 감지
+      // 일반 전경 판단 조건
       const isForeground = s > 12 && v > 30;
 
       if (isForeground) {
-        // 물체 외곽 크기 경계 업데이트
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        detectedForegroundCount++;
+        // 색상 검사가 있는 미션의 경우, 전경 중 '해당 타겟 색상 조건'을 만족하는 픽셀만 전경으로 인정
+        // 이렇게 해야 파란색 보물 미션일 때 파란색 면적이 늘어나는 만큼 채움률 %가 연동되어 상승함
+        let isValidForeground = true;
+        if (mission.color) {
+          isValidForeground = isColorMatch(h, s, v, mission.color);
+        }
 
-        // 타겟 점선 영역 안에 위치하는지 체크
-        if (inMissionArea(x, y)) {
-          overlappingPixels += 9; // 3x3 스캔 보간
-          if (mission.color) {
-            if (isColorMatch(h, s, v, mission.color)) {
+        if (isValidForeground) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          detectedForegroundCount++;
+
+          // 1) 내부 겹침 카운트
+          if (inMissionArea(x, y)) {
+            overlappingPixels += 9;
+            if (mission.color) {
               matchingColorPixels += 9;
             }
-          }
-        } else {
-          // 점선 외부 1.35배 바깥 침범 검사
-          const dx = x - centerX;
-          const dy = y - centerY;
-          if (dx * dx + dy * dy > outerLimitRadius * outerLimitRadius) {
-            outerOverlapPixels += 9;
+          } else {
+            // 2) 외부 이탈 벌점 카운트
+            const dx = x - centerX;
+            const dy = y - centerY;
+            if (dx * dx + dy * dy > outerLimitRadius * outerLimitRadius) {
+              outerOverlapPixels += 9;
+            }
           }
         }
       }
     }
   }
 
-  // 최종 채움률 연산
+  // 채움 비율 계산
   const baseRatio = (overlappingPixels / areaPixelCount) * 100;
   const penaltyRatio = (outerOverlapPixels / areaPixelCount) * 40; 
   const fillRatio = Math.max(0, Math.min(100, Math.round(baseRatio - penaltyRatio)));
   
   let colorMatched = false;
   if (mission.color) {
+    // 색상이 지정된 경우, 영역 내 검출 픽셀 수 중 목표 색상 매칭 비중이 35% 이상이면 최종 성공 허가
     const targetMatchRatio = 0.35;
     colorMatched = overlappingPixels > 10 && (matchingColorPixels / overlappingPixels) >= targetMatchRatio;
   } else {
     colorMatched = true;
   }
 
-  // 2. 바운딩 박스 유효성 검사 보강
   let detectedRect = null;
   if (detectedForegroundCount > 15 && minX < maxX && minY < maxY) {
     detectedRect = {
