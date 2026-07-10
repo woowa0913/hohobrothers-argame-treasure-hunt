@@ -1,6 +1,6 @@
 // 미션 데이터를 정의하고 랜덤하게 셔플하여 스테이지를 제공하는 모듈
 
-export const COLORS = ['빨강', '파랑', '노랑', '초록'];
+export const COLORS = ['빨강', '파랑', '노랑', '초록', '주황'];
 export const SHAPES = ['circle', 'square'];
 
 // 크기별 비율 정의 (화면 폭 대비 점선 지름/한 변 길이 비율 %)

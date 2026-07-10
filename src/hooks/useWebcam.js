@@ -9,16 +9,25 @@ export function useWebcam() {
   // OpenCV.js 준비 상태 확인
   useEffect(() => {
     let interval;
-    if (window.cv) {
-      setIsOpenCVReady(true);
-    } else {
-      interval = setInterval(() => {
-        if (window.cv && window.cv.Mat) {
+    const checkOpenCV = () => {
+      if (window.cv && window.cv.Mat && window.cv.imread) {
+        setIsOpenCVReady(true);
+        if (interval) clearInterval(interval);
+        return true;
+      }
+      return false;
+    };
+
+    if (!checkOpenCV()) {
+      // 만약 아직 로드가 다 안됐다면 window.Module 이벤트를 함께 대기하거나 주기적으로 폴링
+      if (window.cv) {
+        window.cv.onRuntimeInitialized = () => {
           setIsOpenCVReady(true);
-          clearInterval(interval);
-        }
-      }, 300);
+        };
+      }
+      interval = setInterval(checkOpenCV, 200);
     }
+
     return () => {
       if (interval) clearInterval(interval);
     };
